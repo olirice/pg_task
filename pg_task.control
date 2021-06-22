@@ -1,0 +1,3 @@
+comment = 'Postgres background task extension'
+default_version = '0.0.1'
+relocatable = false

@@ -1,0 +1,27 @@
+-- Create pg_task 
+create schema ext;
+create extension pg_task with schema ext;
+-- create queue
+begin;
+    select ext.create_queue('heavy', 'FIFO');
+ create_queue 
+--------------
+            2
+(1 row)
+
+rollback;
+-- create queue idempotent
+begin;
+    select ext.create_queue('heavy', 'FIFO');
+ create_queue 
+--------------
+            3
+(1 row)
+
+    select ext.create_queue('heavy', 'FIFO');
+ create_queue 
+--------------
+             
+(1 row)
+
+rollback;

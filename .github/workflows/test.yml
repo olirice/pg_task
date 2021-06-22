@@ -1,0 +1,32 @@
+name: test
+on: [push, pull_request]
+
+jobs:
+  linux:
+
+    env:
+      OS_VERSION: ubuntu-20.04
+      OS_PGNAME: focal-pgdg
+      OS_PGVER: 13
+      PG_VERSION: 13
+
+    runs-on: ubuntu-20.04
+
+    steps:
+
+    - name: 'Check Out'
+      uses: actions/checkout@v2
+
+    - name: 'Restart PG with Config'
+      run: |
+        sudo cp ./ci/pg_hba.conf /etc/postgresql/$PG_VERSION/main/pg_hba.conf
+        sudo /etc/init.d/postgresql stop
+        sudo /etc/init.d/postgresql start
+
+    - name: 'Build & Test'
+      run: |
+        export PATH=/usr/lib/postgresql/13/bin/:$PATH
+        make
+        sudo make install
+        PGUSER=postgres PGPORT=5432 make installcheck || (cat regression.diffs && /bin/false)
+

@@ -1,0 +1,18 @@
+site_name: pg_task
+site_url: https://olirice.github.io/pg_task
+site_description: A PostgreSQL extension for managing background tasks
+
+theme:
+    name: 'material'
+
+repo_name: olirice/pg_task
+repo_url: https://github.com/olirice/pg_task
+
+nav:
+    - Introduction: 'index.md'
+    - Quickstart: 'quickstart.md'
+    - API Reference: 'api.md'
+
+markdown_extensions:
+  - codehilite
+  - admonition
