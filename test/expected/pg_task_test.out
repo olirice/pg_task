@@ -80,13 +80,6 @@ begin;
  t
 (1 row)
 
-    -- No tasks reamin
-    select ext.acquire_task('default') is not null;
- ?column? 
-----------
- t
-(1 row)
-
 rollback;
 -- enqueue fail for queue does not exist
 begin;
