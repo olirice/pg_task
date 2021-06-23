@@ -4,7 +4,7 @@ create extension pg_task with schema ext;
 
 
 -- default queue exists
-select * from ext.queue;
+select count(1) from ext.queue;
 
 -- upsert_queue
 begin;
