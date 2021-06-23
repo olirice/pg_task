@@ -10,8 +10,9 @@ repo_url: https://github.com/olirice/pg_task
 
 nav:
     - Introduction: 'index.md'
-    - Quickstart: 'quickstart.md'
+    - Installation: 'installation.md'
     - API Reference: 'api.md'
+    - Usage: 'usage.md'
 
 markdown_extensions:
   - codehilite
