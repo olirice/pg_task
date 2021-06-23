@@ -75,3 +75,5 @@ begin;
     select ext.acquire_task('default') is not null;
 rollback;
 
+
+-- TODO test all variants of enum retry_strategy do not raise in next_retry_after

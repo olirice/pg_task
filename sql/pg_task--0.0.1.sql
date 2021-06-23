@@ -77,6 +77,7 @@ create table @extschema@.acquired_task (
     task_name text primary key,
     params jsonb not null
 );
+-- TODO add task_id and attempt_id
 
 ----------------
 -- Operations --
