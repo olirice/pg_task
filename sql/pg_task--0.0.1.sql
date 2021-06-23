@@ -3,7 +3,7 @@
 -----------------
 create type @extschema@.queue_strategy as enum ('FIFO');
 create type @extschema@.retry_strategy as enum ('CONSTANT');
-create type @extschema@.task_status as enum ('PENDING', 'RUNNING', 'COMPLETED');
+create type @extschema@.task_status as enum ('PENDING', 'RUNNING', 'FINISHED');
 create type @extschema@.attempt_status as enum ('SUCCESS', 'FAILURE');
 
 -- Pattern:  Standard
@@ -64,8 +64,7 @@ create table @extschema@.attempt (
 -- Pattern: Append Only
 -- Est Rows: > 1M
 create table @extschema@.attempt_result (
-    id bigserial primary key,
-    attempt_id smallint not null references @extschema@.attempt(id) on delete cascade,
+    attempt_id bigint primary key references @extschema@.attempt(id) on delete cascade,
     result @extschema@.attempt_status not null,
     context jsonb not null default '{}',
     created_at timestamp not null default timezone('utc', now())
@@ -222,7 +221,10 @@ begin
     insert into @extschema@.attempt(task_id) values (decl.task.id) returning id into decl.attempt_id;
 
     -- Set attmpt_id in transaction local config for reference in `release_task`
-    perform set_config('pg_task.attempt_id', decl.attempt_id::text, true);
+    perform
+        set_config('pg_task.task.id', decl.task.id::text, true),
+        set_config('pg_task.task.task_definition_id', decl.task.task_definition_id::text, true),
+        set_config('pg_task.attempt.id', decl.attempt_id::text, true);
 
     -- Populate and return an acquired_task record 
     return
@@ -237,35 +239,74 @@ begin
 end;
 $$ language plpgsql strict;
 
--- TODO
+
+create function @extschema@.next_retry_after(
+    current_after timestamp,
+    retry_strategy @extschema@.retry_strategy,
+    retry_interval interval
+)
+returns timestamp as
+$$
+#variable_conflict use_column
+<<decl>>
+begin
+    -- TODO
+    if retry_strategy = 'CONSTANT' then
+        return now() + retry_interval;
+    end if;
+
+    raise exception 'Unknown retry strategy %', retry_strategy::text;
+end;
+$$ language plpgsql;
+
+
 create function @extschema@.release_task(result @extschema@.attempt_status, context jsonb default '{}')
-returns boolean as
+returns bigint as
 $$
 #variable_conflict use_column
 <<decl>>
 declare
     result alias for $1;
     context alias for $2;
-    attempt_id bigint := current_setting('pg_task.attempt_id', false);
-    task_id bigint;
+    attempt_id bigint := current_setting('pg_task.attempt.id', false);
+    task_id bigint := current_setting('pg_task.task.id', false);
+    task_def_id bigint := current_setting('pg_task.task.task_definition_id', false);
+   -- task @extschema@.task;
+    task_def @extschema@.task_definition;
 begin
     insert into @extschema@.attempt_result(attempt_id, result, context)
     values (decl.attempt_id, decl.result, decl.context);
 
-    decl.task_id := select task_id from @extschema@.attempt where id = decl.attempt_id limit 1;
-
     if decl.result = 'SUCCESS' then
-        update @extschema@.task set status = 'COMPLETE' where id = decl.task_id;
+        update @extschema@.task
+        set status = 'FINISHED'
+        where id = decl.task_id;
+
+        return decl.task_id;
     end if;
 
     if decl.result = 'FAILURE' then
-        -- TODO handle retries here
-        select 1;
+        -- Update `after` timestamp using rules defined on task_definition
+        select *
+        from @extschema@.task_definition td
+        where td.id = decl.task_def_id
+        into decl.task_def;
+
+        update @extschema@.task
+        set after = @extschema@.next_retry_after(
+            timezone('utc', now()),
+            decl.task_def.retry_strategy,
+            decl.task_def.retry_delay
+        )
+        where id = decl.task_id;
+
+        return decl.task_id;
     end if;
 
+    raise exception 'Unknown result attempt status %', result::text;
 end;
 
-$$ language sql;
+$$ language plpgsql;
 
 
 ----------------
@@ -273,18 +314,3 @@ $$ language sql;
 ----------------
 
 -- TODO
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

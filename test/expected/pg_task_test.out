@@ -88,3 +88,72 @@ begin;
 ERROR:  queue other-DNEs does not exist
 CONTEXT:  PL/pgSQL function ext.enqueue_task(text,jsonb,timestamp without time zone,text) line 39 at RAISE
 rollback;
+-- releasing task on success removes it from work queue
+begin;
+    -- enqueue one task
+    select ext.enqueue_task('resize_image', '{"height": 10}', timezone('utc', now())) > 0;
+ ?column? 
+----------
+ t
+(1 row)
+
+    -- acquire that task
+    select ext.acquire_task('default') is not null;
+ ?column? 
+----------
+ t
+(1 row)
+
+    -- release task on sucess
+    select ext.release_task('SUCCESS', '{"msg": "task completed successfully"}') > 0;
+ ?column? 
+----------
+ t
+(1 row)
+
+    -- no work remains
+    select ext.acquire_task('default') is null;
+ ?column? 
+----------
+ t
+(1 row)
+
+rollback;
+-- releasing task on failure re-enqueues
+begin;
+    -- create task def with 0 delay to retry
+    select ext.upsert_task_definition('resize_image', 'default', 1, 'CONSTANT', '0 seconds') > 0;
+ ?column? 
+----------
+ t
+(1 row)
+
+    -- enqueue one task
+    select ext.enqueue_task('resize_image', '{"height": 10}', timezone('utc', now())) > 0;
+ ?column? 
+----------
+ t
+(1 row)
+
+    -- acquire that task
+    select ext.acquire_task('default') is not null;
+ ?column? 
+----------
+ t
+(1 row)
+
+    -- release task on sucess
+    select ext.release_task('FAILURE', '{"msg": "task failed"}') > 0;
+ ?column? 
+----------
+ t
+(1 row)
+
+    -- work remains
+    select ext.acquire_task('default') is not null;
+ ?column? 
+----------
+ t
+(1 row)
+
+rollback;

@@ -46,3 +46,32 @@ begin;
     -- Expected to fail
     select ext.enqueue_task('resize_image', '{}', timezone('utc', now()), 'other-DNE');
 rollback;
+
+
+-- releasing task on success removes it from work queue
+begin;
+    -- enqueue one task
+    select ext.enqueue_task('resize_image', '{"height": 10}', timezone('utc', now())) > 0;
+    -- acquire that task
+    select ext.acquire_task('default') is not null;
+    -- release task on sucess
+    select ext.release_task('SUCCESS', '{"msg": "task completed successfully"}') > 0;
+    -- no work remains
+    select ext.acquire_task('default') is null;
+rollback;
+
+
+-- releasing task on failure re-enqueues
+begin;
+    -- create task def with 0 delay to retry
+    select ext.upsert_task_definition('resize_image', 'default', 1, 'CONSTANT', '0 seconds') > 0;
+    -- enqueue one task
+    select ext.enqueue_task('resize_image', '{"height": 10}', timezone('utc', now())) > 0;
+    -- acquire that task
+    select ext.acquire_task('default') is not null;
+    -- release task on sucess
+    select ext.release_task('FAILURE', '{"msg": "task failed"}') > 0;
+    -- work remains
+    select ext.acquire_task('default') is not null;
+rollback;
+

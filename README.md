@@ -14,38 +14,4 @@
 
 ---
 
-A PostgreSQL extension for migrations and DDL tracking.
-
-
-### Installation
-
-Requires:
-
- - Postgres 11+
-
-
-```shell
-git clone https://github.com/olirice/pg_task.git
-cd pg_task
-make install
-```
-
-### Testing
-Requires:
-
- - Postgres 11+
-
-
-```shell
-make install && make installcheck;
-```
-
-### Usage
-
-In PSQL
-```sql
-create extension pg_task;
-
--- TODO
-```
-
+`pg_task` is a PostgreSQL extension for using your database as a background task queue.
