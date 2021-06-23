@@ -1,31 +1,20 @@
-# pg_migrate
+# pg_task
 
 <p>
 
-<a href="https://github.com/olirice/pg_migrate/actions"><img src="https://github.com/olirice/pg_migrate/workflows/test/badge.svg" alt="Tests" height="18"></a>
+<a href="https://github.com/olirice/pg_task/actions"><img src="https://github.com/olirice/pg_task/workflows/test/badge.svg" alt="Tests" height="18"></a>
 
 </p>
 
 ---
 
-**Documentation**: <a href="https://olirice.github.io/pg_migrate" target="_blank">https://olirice.github.io/pg_migrate</a>
+**Documentation**: <a href="https://olirice.github.io/pg_task" target="_blank">https://olirice.github.io/pg_task</a>
 
-**Source Code**: <a href="https://github.com/olirice/pg_migrate" target="_blank">https://github.com/olirice/pg_migrate</a>
+**Source Code**: <a href="https://github.com/olirice/pg_task" target="_blank">https://github.com/olirice/pg_task</a>
 
 ---
 
 A PostgreSQL extension for migrations and DDL tracking.
-
-
-## API
-
-- migrations.revision
-- migrations.persist_ddl()
-- TODO: migrations.upgrade(revision_id_or_tag text)
-- TODO: migrations.downgrade(revision_id_or_tag text)
-- TODO: migrations.merge(revision_id, revision_id)
-- TODO: migrations.export()
-
 
 
 ### Installation
@@ -36,8 +25,8 @@ Requires:
 
 
 ```shell
-git clone https://github.com/olirice/pg_migrate.git
-cd pg_migrate
+git clone https://github.com/olirice/pg_task.git
+cd pg_task
 make install
 ```
 
@@ -48,27 +37,15 @@ Requires:
 
 
 ```shell
-PGUSER=postgres make install && PGUSER=postgres make installcheck || (cat regression.diffs && /bin/false)
+make install && make installcheck;
 ```
 
 ### Usage
 
-Setup
-```shell
-createdb pgmig
-createuser -s postgres
-```
-
-Launch postgres repl with
-```
-psql -d pgmig -U postgres
-```
-
 In PSQL
 ```sql
-create extension pg_migrate;
+create extension pg_task;
 
--- Confirm everything worked
-select * from migrations.revision
+-- TODO
 ```
 
