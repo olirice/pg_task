@@ -2,7 +2,7 @@
 -- Persistence -- 
 -----------------
 create type @extschema@.queue_strategy as enum ('FIFO');
-create type @extschema@.retry_strategy as enum ('CONSTANT', 'EXPONENTIAL');
+create type @extschema@.retry_strategy as enum ('CONSTANT');
 create type @extschema@.task_status as enum ('PENDING', 'RUNNING', 'COMPLETED');
 create type @extschema@.attempt_status as enum ('SUCCESS', 'FAILURE');
 
@@ -24,7 +24,7 @@ create table @extschema@.task_definition (
     name text not null unique,
     default_queue_id smallint not null references @extschema@.queue(id) default 1,
     retries integer not null default 0,
-    retry_strategy @extschema@.retry_strategy not null default 'EXPONENTIAL',
+    retry_strategy @extschema@.retry_strategy not null default 'CONSTANT',
     retry_delay interval not null default '1 second',
     created_at timestamp not null default timezone('utc', now())
 );
@@ -45,8 +45,7 @@ create index ix_task_acquire on @extschema@.task (queue_id, after) where (status
 -- Pattern:  Append Only
 -- Est Rows: > 1M
 create table @extschema@.task_params (
-    id bigserial primary key,
-    task_id smallint not null unique references @extschema@.task(id) on delete cascade,
+    task_id bigint primary key references @extschema@.task(id) on delete cascade,
     params jsonb not null default '{}',
     -- Doubles as created_at for task table
     created_at timestamp not null default timezone('utc', now())
@@ -103,7 +102,7 @@ create function @extschema@.upsert_task_definition(
     name text,
     default_queue_name text default 'default',
     retries integer default 0,
-    retry_strategy @extschema@.retry_strategy default 'EXPONENTIAL',
+    retry_strategy @extschema@.retry_strategy default 'CONSTANT',
     retry_delay interval default '10 seconds'
 )
 returns integer as
@@ -133,14 +132,62 @@ create function @extschema@.enqueue_task(
     task_name text,
     params jsonb default '{}',
     after timestamp default null,
-    queue_name text default null
+    queue_name text default 'default'
 )
 returns bigint as
 $$
-    -- if queue_name is null, lookup from task_definition
-    -- if after is null, use timestamp('utc', now())
-    select 1;
-$$ language sql;
+#variable_conflict use_column
+<<decl>>
+declare
+    task_def @extschema@.task_definition;
+    queue @extschema@.queue;
+    after alias for $3;
+    task_id bigint;
+begin
+
+    -- Reference to task definition
+    select
+        *
+    into
+        decl.task_def
+    from
+        @extschema@.task_definition td
+    where
+        td.name = task_name;
+
+    if decl.task_def is null then
+        insert into @extschema@.task_definition(name)
+        values (task_name)
+        returning *
+        into decl.task_def;
+    end if;
+
+    -- Reference to queue
+    select
+        *
+    into
+        decl.queue
+    from
+        @extschema@.queue q
+    where
+        q.name = queue_name;
+
+    if decl.queue is null then
+        raise exception 'queue %s does not exist', queue_name;
+    end if;
+
+    insert into @extschema@.task (queue_id, task_definition_id, after)
+    values (queue.id, task_def.id, decl.after)
+    returning id
+    into decl.task_id;
+
+    insert into @extschema@.task_params(task_id, params)
+    values (decl.task_id, params);
+
+    return task_id;
+end;
+$$ language plpgsql;
+
 
 create function @extschema@.acquire_task(queue_name text default 'default')
 returns @extschema@.acquired_task as
@@ -160,7 +207,7 @@ begin
         @extschema@.task t
     where
         t.queue_id = (select q.id from @extschema@.queue q where name = queue_name)
-        and t.after < timezone('utc', now())
+        and t.after <= timezone('utc', now())
         and t.status='PENDING'
     limit
         1
@@ -172,17 +219,19 @@ begin
     end if;
 
     -- Some work exists
-    attempt_id := insert into @extschema@.attempt(task_id) values (decl.task.id) returning id;
+    insert into @extschema@.attempt(task_id) values (decl.task.id) returning id into decl.attempt_id;
 
     -- Set attmpt_id in transaction local config for reference in `release_task`
-    select set_config('pg_task.attempt_id', attempt_id::text, true);
+    perform set_config('pg_task.attempt_id', decl.attempt_id::text, true);
 
     -- Populate and return an acquired_task record 
-    return select
-        (select name from @extschema@.task_definition where id = decl.task.task_definition_id limit 1) task_name,
-        tp.params,
+    return
+        (
+            (select name from @extschema@.task_definition where id = decl.task.task_definition_id limit 1),
+            tp.params
+        )::@extschema@.acquired_task
     from
-        @extschema.task_params tp
+        @extschema@.task_params tp
     where
         tp.task_id = decl.task.id;
 end;
