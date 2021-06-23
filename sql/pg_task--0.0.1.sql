@@ -214,7 +214,7 @@ begin
     for update skip locked;
 
     -- Exit early if no work exists
-    if decl.task is null -- todo check syntax
+    if decl.task is null
         then return null;
     end if;
 
@@ -272,7 +272,7 @@ $$ language sql;
 -- Monitoring --
 ----------------
 
-
+-- TODO
 
 
 

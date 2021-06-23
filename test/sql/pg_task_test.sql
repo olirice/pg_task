@@ -37,12 +37,7 @@ rollback;
 -- enqueue and get task
 begin;
     select ext.enqueue_task('resize_image', '{"height": 10}', timezone('utc', now()));
-
     select ext.acquire_task('default') = ('resize_image', '{"height": 10}')::ext.acquired_task;
-
-    -- No tasks reamin
-    select ext.acquire_task('default') is not null;
-
 rollback;
 
 
