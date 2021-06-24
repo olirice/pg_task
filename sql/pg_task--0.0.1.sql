@@ -258,7 +258,7 @@ $$
 begin
     -- TODO
     if retry_strategy = 'CONSTANT' then
-        return now() + retry_interval;
+        return timezone('utc', now()) + retry_interval;
     end if;
 
     raise exception 'Unknown retry strategy %', retry_strategy::text;
