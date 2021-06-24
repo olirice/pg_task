@@ -26,6 +26,7 @@ create table @extschema@.task_definition (
     retries integer not null default 0,
     retry_strategy @extschema@.retry_strategy not null default 'CONSTANT',
     retry_delay interval not null default '1 second',
+    -- TODO retention_policy interval not null default '90 days',
     created_at timestamp not null default timezone('utc', now())
 );
 
@@ -74,7 +75,9 @@ create table @extschema@.attempt_result (
 -- Pattern: Type Only (clients may have difficulty with composite types
 -- Est Rows: 0
 create table @extschema@.acquired_task (
-    task_name text primary key,
+    task_id bigint primary key,
+    task_name text not null,
+    attempt_id bigint not null,
     params jsonb not null
 );
 -- TODO add task_id and attempt_id
@@ -230,7 +233,9 @@ begin
     -- Populate and return an acquired_task record 
     return
         (
+            decl.task.id,
             (select name from @extschema@.task_definition where id = decl.task.task_definition_id limit 1),
+            decl.attempt_id,
             tp.params
         )::@extschema@.acquired_task
     from
