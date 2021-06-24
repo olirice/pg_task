@@ -75,9 +75,9 @@ create table @extschema@.attempt_result (
 -- Pattern: Type Only (clients may have difficulty with composite types
 -- Est Rows: 0
 create table @extschema@.acquired_task (
-    task_id bigint primary key,
+    task_id bigint primary key references @extschema@.task(id),
     task_name text not null,
-    attempt_id bigint not null,
+    attempt_id bigint not null references @extschema@.attempt(id),
     params jsonb not null
 );
 -- TODO add task_id and attempt_id
